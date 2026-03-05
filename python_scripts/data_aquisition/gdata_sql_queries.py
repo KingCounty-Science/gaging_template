@@ -2,7 +2,7 @@ import base64
 import datetime as dt
 from datetime import timedelta
 from datetime import datetime
-
+from sqlalchemy import text
 import pyodbc
 import configparser
 import pandas as pd
@@ -25,7 +25,7 @@ print("gdata database", gdata_database)
 #socrata_api_id = os.getenv("socrata_api_id")
 #socrata_api_secret = os.getenv("socrata_api_secret")
 config = configparser.ConfigParser()
-config.read('python_code\project_files\config\gdata_config.ini')
+config.read('config/gdata_config.ini')
 
 
    
@@ -41,7 +41,175 @@ sql_alchemy_connection = urllib.parse.quote_plus(
 engine = create_engine(f"mssql+pyodbc:///?odbc_connect={sql_alchemy_connection}")
 sql_engine = create_engine(f"mssql+pyodbc:///?odbc_connect={sql_alchemy_connection}")
 
+def get_all_tables(engine) -> pd.DataFrame:
+    query = text("""
+        SELECT 
+            t.TABLE_NAME,
+            p.rows AS ROW_COUNT,
+            SUM(a.total_pages) * 8 AS TOTAL_SIZE_KB,
+            SUM(a.used_pages) * 8 AS USED_SIZE_KB
+        FROM INFORMATION_SCHEMA.TABLES t
+        JOIN sys.partitions p 
+            ON p.object_id = OBJECT_ID(t.TABLE_NAME)
+        JOIN sys.allocation_units a 
+            ON a.container_id = p.partition_id
+        WHERE t.TABLE_TYPE = 'BASE TABLE'
+            AND p.index_id IN (0, 1)
+        GROUP BY t.TABLE_NAME, p.rows
+        ORDER BY p.rows DESC
+    """)
+    with engine.connect() as conn:
+        return pd.read_sql(query, conn)
 
+def get_discharge_table(engine) -> pd.DataFrame:
+    query = text("""
+        SELECT 
+                d.G_ID,
+                g.SITE_CODE,
+                g.STATUS,
+                g.DATE_INSTA,
+                g.DATE_REMOV,
+                COUNT(*) AS ROW_COUNT,
+                COUNT(*) * 8 AS APPROX_SIZE_KB
+        FROM tblDischargeGauging d
+        LEFT JOIN tblGaugeLLID g
+                ON d.G_ID = g.G_ID
+        GROUP BY d.G_ID, g.SITE_CODE, g.STATUS, g.DATE_INSTA, g.DATE_REMOV
+        ORDER BY g.STATUS, ROW_COUNT DESC
+        """)
+    with engine.connect() as conn:
+        return pd.read_sql(query, conn)
+
+def groundwater_query(engine) -> pd.DataFrame:
+        query = text("""
+    SELECT
+        p.G_ID,
+        g.SITE_CODE AS site,
+        g.SITE_NAME AS site_name,
+        g.LAT AS latitude,
+        g.LON AS longitude,
+        DATEADD(hour, -7, p.P_TimeDate) AS datetime,
+        p.P_Value AS data,
+        p.P_Level AS corrected_data,
+        p.P_Est AS est,
+        p.P_Lock AS published,
+        p.P_Warning AS warning,
+        p.P_Provisional AS provisional,
+        p.P_NonDetect AS non_detect,
+        'groundwater_level' AS parameter
+    FROM tblPiezometerGauging p
+    LEFT JOIN tblGaugeLLID g
+        ON p.G_ID = g.G_ID
+    WHERE p.G_ID IN (1935, 1936, 1938)
+        AND p.P_TimeDate >= '2024-10-01'
+    ORDER BY p.G_ID, datetime
+""")
+        with engine.connect() as conn:
+                return pd.read_sql(query, conn)
+
+def discharge_query(engine) -> pd.DataFrame:
+        query = text("""
+    SELECT
+        p.G_ID,
+        g.SITE_CODE AS site,
+        g.SITE_NAME AS site_name,
+        g.LAT AS latitude,
+        g.LON AS longitude,
+        DATEADD(hour, -7, p.D_TimeDate) AS datetime,
+        p.D_Value AS data,
+        p.D_Stage AS stage,
+        p.D_Discharge AS discharge,
+        p.D_Est AS est,
+        p.D_Lock AS published,
+        p.D_Warning AS warning,
+        p.D_Provisional AS provisional,
+        'discharge' AS parameter
+    FROM tblDischargeGauging p
+    LEFT JOIN tblGaugeLLID g
+        ON p.G_ID = g.G_ID
+    WHERE p.G_ID IN (1122, 1675, 1674)
+        AND p.D_TimeDate >= '2025-10-01'
+    ORDER BY p.G_ID, datetime
+""")
+        with engine.connect() as conn:
+                return pd.read_sql(query, conn)
+
+
+def get_field_observations_for_sites(engine) -> pd.DataFrame:
+        query = text("""
+    SELECT
+        fv.G_ID,
+        g.SITE_CODE AS site,
+        g.SITE_NAME AS site_name,
+        DATEADD(hour, -7, fv.Date_Time) AS datetime,
+        fv.Stage_Feet AS stage,
+        fv.Measurement_Number AS measurement,
+        fv.Comments AS notes,
+        fd.Parameter AS parameter,
+        fd.Parameter_Value AS value,
+        cp.Parameter_Name AS parameter_name,
+        cp.Units AS units
+    FROM tblFieldVisitInfo fv
+    LEFT JOIN tblGaugeLLID g
+        ON fv.G_ID = g.G_ID
+    LEFT JOIN tblFieldData fd
+        ON fv.FieldVisit_ID = fd.FieldVisit_ID
+    LEFT JOIN tblContinuousParameters cp
+        ON fd.Parameter = cp.Parameter_ID
+    WHERE fv.G_ID IN (1935, 1936, 1938, 1122, 1675, 1674, 1673)
+    ORDER BY fv.G_ID, datetime
+""")
+        with engine.connect() as conn:
+                return pd.read_sql(query, conn)
+
+
+def get_ratings_from_sites(engine) -> pd.DataFrame:
+        query = text("""
+    SELECT
+        RTRIM(fr.RatingNumber) AS rating,
+        fr.G_ID,
+        g.SITE_CODE AS site,
+        fr.WaterLevel AS stage_rating,
+        fr.Discharge AS discharge_rating,
+        fr.Marker AS marker,
+        frs.Offset AS rating_offset
+    FROM tblFlowRatings fr
+    LEFT JOIN tblGaugeLLID g
+        ON fr.G_ID = g.G_ID
+    LEFT JOIN tblFlowRating_Stats frs
+        ON RTRIM(frs.Rating_Number) = RTRIM(fr.RatingNumber)
+    WHERE RTRIM(fr.RatingNumber) IN ('58A_02', '58C_01', '58D_06', '58E_07', '58F_06.1')
+    ORDER BY fr.G_ID, fr.WaterLevel
+""")
+        with engine.connect() as conn:
+                return pd.read_sql(query, conn)
+
+
+def get_sql_engine():
+        from sqlalchemy import create_engine
+        import urllib
+
+        import os
+        from dotenv import load_dotenv
+
+        load_dotenv(r'.env')  # path relative to where you run the script
+
+        gdata_server = os.getenv("gdata_server")
+        gdata_driver = os.getenv("gdata_driver")
+        gdata_database = os.getenv("gdata_database")
+        print("gdata database", gdata_database)
+
+        # pyodbc has a longer pooling then sql_alchemy and needs to be reset
+        pyodbc.pooling = False
+        # not sure this fast execumetry sped things up
+        # info on host name connection https://docs.sqlalchemy.org/en/14/dialects/mssql.html#connecting-to-pyodbc
+        sql_alchemy_connection = urllib.parse.quote_plus(
+        f'DRIVER={{{gdata_driver}}}; SERVER={gdata_server}; DATABASE={gdata_database}; Trusted_Connection=yes;')
+
+        #engine = sqlalchemy.create_engine(f"mssql+pyodbc:///?odbc_connect={sql_alchemy_connection}")
+        engine = create_engine(f"mssql+pyodbc:///?odbc_connect={sql_alchemy_connection}")
+        sql_engine = create_engine(f"mssql+pyodbc:///?odbc_connect={sql_alchemy_connection}")
+        return sql_engine
 
 def sql_import(parameter, site, start_date, end_date):
     """selects data fro site based on sql id; selects all data or accepts start date and end date

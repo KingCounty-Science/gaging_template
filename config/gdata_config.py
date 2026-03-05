@@ -604,12 +604,6 @@ BATTERY = {
     "telemetry_file": "File_Name",
 }
 
-SQL_CONNECTION = {
-    "driver": "SQL Server",
-    "server": "KCITSQLPRNRPX01",
-    "database": "gData",
-    "trusted_connection": "yes",
-}
 
 OBSERVATION = {
     "observation_table": "tblFieldVisitInfo",

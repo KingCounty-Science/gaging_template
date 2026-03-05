@@ -48,10 +48,12 @@ template for stream gaging projects based on DrivenDatas Cookiecutter DataScienc
     ├── __init__.py             <- Makes g_data_template a Python module
     │
     ├── dataset.py              <- Scripts to download or generate data
+    ├── config.py              <- basic config
     │
     ├── features.py             <- Code to create features for modeling
     ├── data_aquisition  
     │   ├── gdata_sql_queriess.py        <- Code for various gdata sql queries 
+    │   ├── gdata_mapping.py        <- map gdata
     │   └── load_data.py            <- Code to load data           
     │
     ├── modeling                
@@ -64,3 +66,15 @@ template for stream gaging projects based on DrivenDatas Cookiecutter DataScienc
 
 --------
 
+# to install your own python project
+py -m pip install -e  . 
+# add file to project scripts
+[project.scripts]
+gdata_mapping = "python_scripts.data_aquisition.gdata_mapping:app"
+# reinstall
+py -m pip install -e  . 
+# run
+gdata_mapping --site-id "0"
+python -m python_scripts.data_aquisition.gdata_mapping list-tables ### you might have to run this as there is a security issue
+# to reset folder path
+python -m python_scripts.data_aquisition.gdata_mapping list-tables --output-path "C:\some\other\path\tables.csv"

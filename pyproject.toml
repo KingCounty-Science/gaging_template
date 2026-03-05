@@ -3,30 +3,29 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "g_data_template"
+name = "python_scripts"
 version = "0.0.1"
 description = "template for stream gaging projects based on DrivenDatas Cookiecutter DataScience"
+readme = "README.md"
+requires-python = "~=3.14.2"
 authors = [
   { name = "Ian Higgins" },
 ]
-
-readme = "README.md"
 classifiers = [
     "Programming Language :: Python :: 3",
-    
 ]
-requires-python = "~=3.1.0"
 
+[project.scripts]
+gdata_mapping = "python_scripts.data_aquisition.gdata_mapping:app"
 
 [tool.ruff]
 line-length = 99
-src = ["g_data_template"]
-include = ["pyproject.toml", "g_data_template/**/*.py"]
+src = ["python_scripts"]
+include = ["pyproject.toml", "python_scripts/**/*.py"]
 
 [tool.ruff.lint]
-extend-select = ["I"]  # Add import sorting
-
-[tool.ruff.lint.isort]
-known-first-party = ["g_data_template"]
+extend-select = ["I"]
 force-sort-within-sections = true
 
+[tool.ruff.lint.isort]
+known-first-party = ["python_scripts"]pip install -e .
