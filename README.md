@@ -11,7 +11,11 @@ template for stream gaging projects based on DrivenDatas Cookiecutter DataScienc
 ```
 ├── LICENSE            <- Open-source license if one is chosen
 ├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
-├── README.md          <- The top-level README for developers using this project.
+├── README.md          <- The top-level README for developers using this project.'
+├── config
+│   ├── gdata_config.ini   <- config file for accessing gdata with standardized names 
+│   ├── gdata_config.py    <- template for moving gdata config to a pythong config
+│   ├── config.py          <- Store useful variables and configuration
 ├── data
 │   ├── external       <- Data from third party sources.
 │   ├── interim        <- Intermediate data that has been transformed.
@@ -39,15 +43,16 @@ template for stream gaging projects based on DrivenDatas Cookiecutter DataScienc
 │
 ├── setup.cfg          <- Configuration file for flake8
 │
-└── g_data_template   <- Source code for use in this project.
+└── python_scripts   <- Source code for use in this project.
     │
     ├── __init__.py             <- Makes g_data_template a Python module
-    │
-    ├── config.py               <- Store useful variables and configuration
     │
     ├── dataset.py              <- Scripts to download or generate data
     │
     ├── features.py             <- Code to create features for modeling
+    ├── data_aquisition  
+    │   ├── gdata_sql_queriess.py        <- Code for various gdata sql queries 
+    │   └── load_data.py            <- Code to load data           
     │
     ├── modeling                
     │   ├── __init__.py 
